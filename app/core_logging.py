@@ -24,7 +24,7 @@ def configure_logging() -> None:
         "%(asctime)s %(levelname)s %(name)s %(message)s"
     ))
 
-    for name in ("nora.watch", "nora.watch.commands", "nora.actions"):
+    for name in ("nora.watch", "nora.watch.commands", "nora.actions", "nora.theory"):
         logger = logging.getLogger(name)
         logger.setLevel(logging.INFO)
         logger.addHandler(handler)

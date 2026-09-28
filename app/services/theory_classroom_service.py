@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import tempfile
 import threading
@@ -10,6 +11,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from app.config import settings
+
+
+logger = logging.getLogger("nora.theory")
 
 
 class TheoryClassroomError(ValueError):
@@ -177,19 +181,33 @@ REGLAS OBLIGATORIAS:
 - Devuelve SOLAMENTE JSON válido, sin Markdown, con estas claves exactas: title, prompt, concepts, response_type.
 - concepts debe ser una lista no vacía formada exclusivamente por valores copiados literalmente desde allowed_concepts.
 - title debe ser breve y prompt debe ser autosuficiente en español."""
+        stage = "openai_request"
         try:
             response = self._client.responses.create(
                 model=self._model,
                 instructions=instructions,
                 input="THEORY_CONTEXT:\n" + json.dumps(safe_context, ensure_ascii=False),
             )
+            stage = "response_parse"
             raw = (response.output_text or "").strip()
             generated = json.loads(raw)
         except json.JSONDecodeError as exc:
+            logger.error(
+                "THEORY_GENERATION_FAILED stage=%s error_type=%s",
+                stage,
+                type(exc).__name__,
+            )
             raise TheoryClassroomError("OpenAI devolvió una actividad Theory con formato inválido.") from exc
         except TheoryClassroomError:
             raise
         except Exception as exc:
+            logger.error(
+                "THEORY_GENERATION_FAILED stage=%s error_type=%s status_code=%s request_id=%s",
+                stage,
+                type(exc).__name__,
+                getattr(exc, "status_code", None),
+                getattr(exc, "request_id", None),
+            )
             raise TheoryClassroomError("No fue posible generar la actividad Theory.") from exc
         if not isinstance(generated, dict):
             raise TheoryClassroomError("OpenAI devolvió una actividad Theory inválida.")

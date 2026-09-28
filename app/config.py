@@ -10,7 +10,7 @@ load_dotenv(BASE_DIR / ".env")
 
 class Settings:
     APP_NAME = "NORA Core API"
-    APP_VERSION = "0.12.0.0"
+    APP_VERSION = "0.12.0.1"
 
     OPENAI_API_KEY = os.getenv(
         "OPENAI_API_KEY",
