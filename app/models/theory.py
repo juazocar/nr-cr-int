@@ -30,6 +30,21 @@ class TheoryContextRequest(BaseModel):
     course_id: int = Field(gt=0)
 
 
+class TheoryActivityGenerateRequest(BaseModel):
+    course_id: int = Field(gt=0)
+    topic_codes: list[str] = Field(min_length=1, max_length=12)
+    activity_type: TheoryActivityType
+    difficulty: TheoryDifficulty = TheoryDifficulty.INTERMEDIATE
+    response_type: Literal["MULTIPLE_CHOICE", "SHORT_TEXT", "OPEN_TEXT", "CLASSIFICATION"] | None = None
+
+    @model_validator(mode="after")
+    def normalize_topics(self):
+        self.topic_codes = list(dict.fromkeys(code.strip() for code in self.topic_codes if code.strip()))
+        if not self.topic_codes:
+            raise ValueError("Debe existir al menos un tema curricular.")
+        return self
+
+
 class TheoryActivityCreate(BaseModel):
     course_id: int = Field(gt=0)
     topic_codes: list[str] = Field(min_length=1, max_length=12)

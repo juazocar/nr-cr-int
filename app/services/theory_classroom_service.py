@@ -37,9 +37,14 @@ CURRICULUM = [
 
 
 class TheoryClassroomService:
-    def __init__(self, path: str | Path | None = None):
+    def __init__(self, path: str | Path | None = None, openai_client=None, model: str | None = None):
         self._path = Path(path or settings.THEORY_CLASSROOM_FILE).expanduser()
         self._lock = threading.Lock()
+        self._client = openai_client
+        if self._client is None and settings.OPENAI_API_KEY:
+            from openai import OpenAI
+            self._client = OpenAI(api_key=settings.OPENAI_API_KEY)
+        self._model = model or settings.OPENAI_MODEL
 
     @staticmethod
     def _now() -> str:
@@ -143,6 +148,92 @@ class TheoryClassroomService:
             "sources": [deepcopy(item["source"]) for item in taught],
             "activity_types": ["CASO", "DESAFÍO", "REPASO", "ANALIZAR"],
         }
+
+    def generate_activity(self, payload: dict) -> dict:
+        if not self._client:
+            raise TheoryClassroomError("OpenAI no está configurado para generar actividades Theory.")
+        topics = self.guard(payload["topic_codes"])
+        allowed_concepts = list(dict.fromkeys(concept for item in topics for concept in item["concepts"]))
+        safe_context = {
+            "course": {"key": COURSE_KEY, "name": COURSE_NAME},
+            "topic_codes": [item["topic_code"] for item in topics],
+            "allowed_concepts": allowed_concepts,
+            "sources": [deepcopy(item["source"]) for item in topics],
+            "activity_type": str(payload["activity_type"]),
+            "difficulty": str(payload["difficulty"]),
+            "response_type": payload.get("response_type"),
+        }
+        instructions = """Eres NORA, moderadora y examinadora de una clase teórica. Genera UNA actividad usando EXCLUSIVAMENTE THEORY_CONTEXT.
+REGLAS OBLIGATORIAS:
+- No introduzcas temas, conceptos, normas, herramientas ni contenidos que no estén en allowed_concepts.
+- No amplíes el currículum con conocimiento general aunque lo conozcas.
+- Respeta exactamente activity_type y difficulty.
+- Si response_type viene informado, respétalo; si es null, elige uno entre MULTIPLE_CHOICE, SHORT_TEXT, OPEN_TEXT o CLASSIFICATION.
+- No entregues la respuesta correcta, solución, pauta ni retroalimentación dentro del prompt.
+- CASO: situación contextual para aplicar conceptos permitidos.
+- DESAFÍO: problema de decisión más profundo basado sólo en conceptos permitidos.
+- REPASO: comprobación breve combinando únicamente contenidos permitidos.
+- ANALIZAR: presenta deliberadamente un requisito, plan o conjunto de casos imperfectos para que el alumnado detecte problemas usando conceptos permitidos.
+- Devuelve SOLAMENTE JSON válido, sin Markdown, con estas claves exactas: title, prompt, concepts, response_type.
+- concepts debe ser una lista no vacía formada exclusivamente por valores copiados literalmente desde allowed_concepts.
+- title debe ser breve y prompt debe ser autosuficiente en español."""
+        try:
+            response = self._client.responses.create(
+                model=self._model,
+                instructions=instructions,
+                input="THEORY_CONTEXT:\n" + json.dumps(safe_context, ensure_ascii=False),
+            )
+            raw = (response.output_text or "").strip()
+            generated = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise TheoryClassroomError("OpenAI devolvió una actividad Theory con formato inválido.") from exc
+        except TheoryClassroomError:
+            raise
+        except Exception as exc:
+            raise TheoryClassroomError("No fue posible generar la actividad Theory.") from exc
+        if not isinstance(generated, dict):
+            raise TheoryClassroomError("OpenAI devolvió una actividad Theory inválida.")
+        title = str(generated.get("title") or "").strip()
+        prompt = str(generated.get("prompt") or "").strip()
+        concepts = generated.get("concepts")
+        response_type = str(generated.get("response_type") or "").strip()
+        if not title or not prompt or not isinstance(concepts, list) or not concepts:
+            raise TheoryClassroomError("OpenAI devolvió una actividad Theory incompleta.")
+        if payload.get("response_type") and response_type != payload["response_type"]:
+            raise TheoryClassroomError("OpenAI alteró el tipo de respuesta solicitado.")
+        if response_type not in {"MULTIPLE_CHOICE", "SHORT_TEXT", "OPEN_TEXT", "CLASSIFICATION"}:
+            raise TheoryClassroomError("OpenAI devolvió un tipo de respuesta Theory inválido.")
+        canonical = {concept.casefold(): concept for concept in allowed_concepts}
+        generated_text = f"{title} {prompt}".casefold()
+        forbidden_concepts = {
+            concept
+            for item in CURRICULUM
+            if item["topic_code"] not in safe_context["topic_codes"]
+            for concept in item["concepts"]
+            if concept.casefold() not in canonical
+        }
+        leaked = next((concept for concept in forbidden_concepts if concept.casefold() in generated_text), None)
+        if leaked:
+            raise TheoryClassroomError(f"OpenAI intentó introducir contenido fuera del currículum permitido: {leaked}.")
+        normalized_concepts = []
+        for value in concepts:
+            key = str(value).strip().casefold()
+            if key not in canonical:
+                raise TheoryClassroomError(f"OpenAI intentó utilizar un concepto fuera del currículum permitido: {value}.")
+            if canonical[key] not in normalized_concepts:
+                normalized_concepts.append(canonical[key])
+        activity_payload = {
+            "course_id": payload["course_id"],
+            "topic_codes": [item["topic_code"] for item in topics],
+            "concepts": normalized_concepts,
+            "activity_type": payload["activity_type"],
+            "difficulty": payload["difficulty"],
+            "title": title,
+            "prompt": prompt,
+            "response_type": response_type,
+            "sources": [deepcopy(item["source"]) for item in topics],
+        }
+        return self.create_activity(activity_payload)
 
     def create_activity(self, payload: dict) -> dict:
         topics = self.guard(payload["topic_codes"])

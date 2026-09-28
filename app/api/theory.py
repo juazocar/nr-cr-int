@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.api.student_quiz import teacher_auth
-from app.models.theory import MarkTopicTaughtRequest, TheoryActivityCreate, TheoryContextRequest
+from app.models.theory import MarkTopicTaughtRequest, TheoryActivityCreate, TheoryActivityGenerateRequest, TheoryContextRequest
 from app.services.theory_classroom_service import TheoryClassroomError, TheoryClassroomService
 
 router = APIRouter(prefix="/api/theory", tags=["Theory Classroom"], dependencies=[Depends(teacher_auth)])
@@ -29,6 +29,14 @@ def mark_taught(payload: MarkTopicTaughtRequest):
 def context(payload: TheoryContextRequest):
     try:
         return {"success": True, "context": service.context(payload.course_id)}
+    except TheoryClassroomError as exc:
+        fail(exc)
+
+
+@router.post("/activities/generate")
+def generate_activity(payload: TheoryActivityGenerateRequest):
+    try:
+        return {"success": True, "activity": service.generate_activity(payload.model_dump(mode="json"))}
     except TheoryClassroomError as exc:
         fail(exc)
 
