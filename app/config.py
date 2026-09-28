@@ -10,7 +10,7 @@ load_dotenv(BASE_DIR / ".env")
 
 class Settings:
     APP_NAME = "NORA Core API"
-    APP_VERSION = "0.10.0.0"
+    APP_VERSION = "0.11.0.0"
 
     OPENAI_API_KEY = os.getenv(
         "OPENAI_API_KEY",
@@ -45,6 +45,7 @@ class Settings:
     ACTIONS_FILE = os.getenv("NORA_ACTIONS_FILE", str(BASE_DIR / "data" / "actions.json")).strip()
     CLASS_SESSION_FILE = os.getenv("NORA_CLASS_SESSION_FILE", str(BASE_DIR / "data" / "class_session.json")).strip()
     STUDENT_QUIZ_FILE = os.getenv("NORA_STUDENT_QUIZ_FILE", str(BASE_DIR / "data" / "student_quizzes.json")).strip()
+    THEORY_CLASSROOM_FILE = os.getenv("NORA_THEORY_CLASSROOM_FILE", str(BASE_DIR / "data" / "theory_classroom.json")).strip()
     AGENT_STATUS_FILE = os.getenv("NORA_AGENT_STATUS_FILE", str(BASE_DIR / "data" / "agent_status.json")).strip()
     AGENT_STATUS_TTL_SECONDS = int(os.getenv("NORA_AGENT_STATUS_TTL_SECONDS", "35"))
     LOG_FILE = os.getenv("NORA_LOG_FILE", str(BASE_DIR / "logs" / "nora_core.log")).strip()

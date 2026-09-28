@@ -1,5 +1,6 @@
 from app.api.agent import router as agent_router
 from app.api.student_quiz import router as student_quiz_router
+from app.api.theory import router as theory_router
 from app.api.academic_mailer import router as academic_mailer_router
 from app.api.actions import router as actions_router
 from app.api.shared_context import router as shared_context_router
@@ -45,4 +46,5 @@ app.include_router(actions_router)
 app.include_router(agent_router)
 
 app.include_router(student_quiz_router)
+app.include_router(theory_router)
 app.include_router(academic_mailer_router)
