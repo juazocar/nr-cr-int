@@ -1,0 +1,12 @@
+{
+  "user_name": "Juan",
+  "preferred_ide": "intellij",
+  "preferred_language": "java",
+  "projects_dir": "~/NORA/projects",
+  "confirm_overwrite": true,
+  "openai_voice_enabled": true,
+  "openai_voice": "marin",
+  "notprofejuan_api_base": "https://tech-solutions.cl/sth.backend",
+  "nora_window_pinned": false,
+  "interaction_mode": "professor"
+}
